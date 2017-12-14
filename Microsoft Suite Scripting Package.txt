@@ -1,0 +1,322 @@
+#NoEnv  ; Recommended for performance and compatibility with future AutoHotkey releases.
+; #Warn  ; Enable warnings to assist with detecting common errors.
+SendMode Input  ; Recommended for new scripts due to its superior speed and reliability.
+SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
+
+#SingleInstance force ;running program will overwrite old versions without pop up
+
+;AHK Hot Key Library
+;Created by: Matthew Avery Braun Soule
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;CTRL Escape error script
+;Anything goes wrong, press ALT escape to stop the script
+
+ALT & Escape::
+MsgBox, Exiting AHK Script
+ExitApp
+Return
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;Outlook hyperlink script
+; 1)Decide whether clipboard contains valid file path
+; 	a)If no, get file path of selected file or by copying the filepath to the clipboard (shift rt click, then select "Copy as path" and press ok) 
+;	b)If yes, continue program 
+; 2)Decide whether outlook is running
+;	a)If no, launch excel and insert hyperlink in new message
+;	b)If yes, insert hyperlink in new message
+
+ALT & o::
+
+	;Get filepath string
+		;MsgBox, Getting filepath!
+		;Get file path
+		clipboard = ;Empty clipboard
+		SendInput, ^c ;Send keystrokes
+		clipboard := clipboard
+		sleep, 500 ;pause to ensure if auto copy file path has completed executing
+		IfNotInString, clipboard, \
+		{
+			MsgBox, Please copy a valid filepath to the clipboard (On desired file: Shift + Right Click, then select "Copy as path" and press Ok) 
+		}
+		ClipWait ;wait for clipboard to contain text
+		Clipboard := Clipboard
+		MsgBox, Filepath selected is %clipboard%
+	
+	;Make Outlook Active
+	Process, Exist, Outlook.EXE
+	if Errorlevel  ;If Outlook open, create a new email
+		{
+			;MsgBox, Outlook open
+			Run, Outlook.exe /c ipm.note /m %email_add%&subject=%subject_2% ;Set up new message
+			sleep, 500 ;Increase if errors occur and string is pasted before hyperlink code is set up
+		}	
+	else  ;if Outlook closed, open outlook and create new message
+		{
+			;MsgBox, Opening Outlook
+			Run, Outlook ;Open main outlook screen
+			Run, Outlook.exe /c ipm.note /m %email_add%&subject=%subject_2% ;Set up new message
+			sleep, 3000
+		}
+			
+	;Search clipboard to ensure string contains copy path quotes for auto hyperlink feature
+	IfInString, clipboard, \
+		{
+			;MsgBox, " Found
+			Send, {tab}{tab}{tab}^k
+			sleep, 5
+			Send, %clipboard%
+			sleep, 5
+			Send, {Enter}
+		}
+		IfNotInString, clipboard, \
+		{
+			MsgBox, Filepath not found!
+		}
+		
+		clipboard = ;Empty clipboard for next use
+	
+return
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;Microsoft Suite: File backup script 
+
+#If WinActive("ahk_class XLMAIN") || WinActive(" ahk_class OpusApp") || WinActive("Microsoft Project")
+^s::
+
+;Measure execution time
+	StartTime := A_TickCount
+	ElapsedTime := 		;Declare Var
+	
+
+;Main 
+	MsgBox, 0, ,File backup initiated, 1
+	quickSave()		;Save project with quick save 
+	checkWinVer()		;Check script compatibility
+	backupFolder()		;Check/create backup directory
+	saveAs(ElapsedTime, StartTime) 		;Get project title and path for name creation during save as
+
+;Measure execution time
+	ElapsedTime := (A_TickCount - StartTime)/1000
+	Sleep, 2000
+	MsgBox,  File successfully backed up after %ElapsedTime% seconds.
+	return
+
+;Functions
+
+	quickSave()
+	{
+		sendInput, {Ctrl down}s{Ctrl  up}
+	}
+	
+	checkWinVer()
+	{
+		;MsgBox %A_OSVersion%
+		StringLeft, WIN_10, A_OSVersion, 2		;Get first two chars of win version
+	
+		;If (A_OSVersion == "WIN_7")
+			;MsgBox, Operating system: WIN_7
+		;Else If (WIN_10 == "10")
+			;MsgBox, Operating system: %WIN_10%
+		;Else
+			;MsgBox, Windows version may not be compatible, proceed with caution! Press Alt + Esc to end script.
+	}
+	
+	backupFolder()
+	{
+		IfNotExist, c:\Users\%A_Username%\Desktop\Backup
+		{
+			;Communicate with user
+			MsgBox, 0, , Creating new "Backup" folder in c:\Users\%A_Username%\Desktop, 1
+			
+			;Open explorer 
+			explorerPath = C:\Users\%A_Username%\Desktop
+			Run, explore %explorerPath%
+			WinWaitActive, Desktop
+			
+			;Create directory
+			SendInput, ^+n
+			Sleep, 250
+			SendInput, Backup
+			Sleep, 250
+			SendInput, {Enter}
+			
+			;Close Window
+			WinClose
+			Sleep, 1000
+		}
+	}
+	
+	saveAs(ElapsedTime, StartTime)
+	{
+		SendInput, {f12} 	;Save as menu
+		WinWaitActive, Save As	 
+		
+		;Get file name
+			clipboard =:		;Empty clipboard
+			SendInput, {Ctrl down}c{Ctrl up}		;Copy name
+			sleep, 500
+			fileName := clipboard
+		
+		;Get file path 
+		
+		;Edit file path field
+			SetTitleMatchMode, 2 ;line for whole script
+			
+			StringLeft, WIN_10, A_OSVersion, 2		;Get first two chars of win version
+			
+			If (A_OSVersion == "WIN_7")		;WINDOWS 7 BUTTON
+				ControlFocus, ToolbarWindow324, A		;A for active
+			Else If (WIN_10 == "10")
+				ControlFocus, ToolbarWindow325, A		;A for active
+			Else
+			{
+				MsgBox, Windows version may not be compatible, proceed with caution! Press Alt + Esc to end script.
+				ControlFocus, ToolbarWindow324, A		;A for active
+			}
+			
+			SendInput, {Space}
+			Sleep,	500
+		
+		;Copy file path
+			clipboard =:		;Empty clipboard
+			SendInput, {Ctrl down}c{Ctrl up}
+			ClipWait
+			sleep, 500
+			filePath := clipboard
+			fullFilePath = %filePath%\%fileName%
+		
+		;Close save as dialogue
+			WinClose, Save As
+	
+		;Save Backup
+		
+		;Locate file in windows explorer
+			explorerpath:= "explorer /select," filePath
+			Run, %explorerpath%
+			Sleep, 1500		
+			SetTitleMatchMode, 2
+			SendInput, {Enter}
+			Sleep, 250
+			SendInput,  %fileName%
+		
+		;Create copy
+			clipboard :=
+			Sleep, 500
+			SendInput, {Ctrl down}c{Ctrl up} 
+			ClipWait
+			SendInput, {Ctrl down}v{Ctrl up} 
+			Sleep 1000
+			SendInput, {Ctrl down}x{Ctrl up} 
+			Sleep, 500
+			
+		;Move copy	
+			StringLeft, WIN_10, A_OSVersion, 2		;Get first two chars of win version
+
+			If (A_OSVersion == "WIN_7")		;WINDOWS 7 BUTTON
+			{
+				ControlFocus, ToolbarWindow322, A		;A for active
+			}
+			Else If (WIN_10 == "10")
+			{
+				ControlFocus, ToolbarWindow323, A		;A for active
+			}
+			Else
+			{
+				MsgBox, Windows version may not be compatible, proceed with caution! Press Alt + Esc to end script.
+				Sleep, 1000
+				ControlFocus, ToolbarWindow322, A		;A for active
+			}
+			SendInput, {Space}
+		
+			newFileName = %fileName%_%A_DD%-%A_MM%-%A_YYYY%-%A_Hour%-%A_Min%-%A_Sec%
+			backupFilePath = C:\Users\%A_Username%\Desktop\Backup
+			
+			sleep, 100
+			Send, C:\Users\%A_Username%\Desktop\Backup
+			SendInput, {Enter}
+			Sleep, 500
+			SendInput, {Ctrl down}v{Ctrl up} 
+			Sleep 500
+			
+		;Rename File
+			SendInput, {F2}
+			Sleep, 10
+			SendInput, %newFileName%
+			Sleep 100
+			SendInput, {Enter}
+			Sleep, 500
+		
+		;Get number of file backups
+			SetWorkingDir, C:\Users\%A_Username%\Desktop\Backup
+			
+			fileCount = 0		;set to zero
+			Loop %A_WorkingDir%\*
+			{
+				IfInString, A_LoopFileName, %fileName%
+				{
+					fileCount +=  1
+				}
+			}
+			
+		;Delete unwanted files
+			StringLeft, Now_Date, A_Now, 16		;Get current date in 8 char format
+			While(fileCount > 2) 		;If more than 2 files stored, find oldest file and delete
+			{
+				;Find oldest file
+					OldestFileDate := Now_Date
+					OldestFileName := 
+					
+					Loop %A_WorkingDir%\*
+					{
+						IfInString, A_LoopFileName, %fileName%
+						{
+							StringLeft, File_date, A_LoopFileTimeCreated, 16		;Get file date in 8 char format
+							If (File_date <= OldestFileDate) 
+							{
+								OldestFileName := A_LoopFileName
+								OldestFileDate := File_date
+							}	
+						}
+					}
+					
+				StringLeft, File_date, A_LoopFileTimeCreated, 8		;Get file date in 8 char format
+				
+				;Delete oldest file if older than 7 days
+					If (Now_Date - OldestFileDate >= 7) 	|| (fileCount > 2)	
+					{
+						FileDelete, %OldestFileName%
+						fileCount -= 1			;Update file counter
+					}
+					else
+					Gosub, ExitLoop
+			}
+		
+		ExitLoop:
+			WinClose, , Backup		;Close Window
+			ElapsedTime := (A_TickCount - StartTime)/1000
+			Sleep, 2000
+			
+			ifExist, C:\Users\%A_Username%\Desktop\Backup\%newFileName%*.*
+				MsgBox,  File successfully backed up after %ElapsedTime% seconds.
+			Else
+				MsgBox, CAUTION: FILE BACKUP FAILED!
+			Exit
+		
+		;Program routine (Case 2)
+		WinClose, , Backup ;Close Window
+			ifExist, C:\Users\%A_Username%\Desktop\Backup\%newFileName%*.*
+				MsgBox,  File successfully backed up after %ElapsedTime% seconds.
+			Else
+				MsgBox, CAUTION: FILE BACKUP FAILED!
+			Exit
+	}
+
+#IfWinExist
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	
+	
